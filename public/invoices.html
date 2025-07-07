@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Previous Invoices - Velan Traders</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="invoices.css">
+</head>
+<body>
+    <header class="header-bar modern-header">
+        <div class="header-content">
+            <img src="logo.png" alt="Velan Traders Logo" class="logo-header">
+            <h1>Velan Traders <span class="green-title">Invoice Portal</span></h1>
+        </div>
+        <nav class="header-nav">
+            <button class="main-btn" onclick="window.location.href='index.html'">Make an Invoice</button>
+            <button class="main-btn" onclick="window.location.href='invoices.html'">Previous Invoices</button>
+            <button class="main-btn" onclick="window.location.href='product-management.html'">Product Management</button>
+        </nav>
+    </header>
+    <div id="invoices-list">Loading...</div>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="firebaseconfig.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="invoices.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

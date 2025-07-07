@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Management - Velan Traders</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+    /* Responsive product table for mobile */
+    .product-list-simple {
+      width: 100%;
+      max-width: 600px;
+      margin: 2rem auto 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+      overflow-y: auto;
+      max-height: 70vh;
+    }
+    .product-list-item {
+      background: #f8f8f8;
+      border-radius: 8px;
+      padding: 0.7rem 1rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      min-width: 0;
+    }
+    .product-list-name {
+      font-weight: 600;
+      color: #1a6332;
+      font-size: 1.08em;
+      word-break: break-word;
+      max-width: 180px;
+      display: inline-block;
+    }
+    .product-list-unit {
+      color: #888;
+      font-size: 0.98em;
+      margin-left: 0.7em;
+      word-break: break-word;
+      max-width: 80px;
+      display: inline-block;
+    }
+    .product-list-edit-btn {
+      background: #27ae60;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.4rem 1.2rem;
+      font-weight: 600;
+      font-size: 1em;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-content-scrollable {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 10px;
+      min-width: 300px;
+      max-width: 90vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-sizing: border-box;
+    }
+    .notification {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #27ae60;
+      color: #fff;
+      padding: 0.8rem 2rem;
+      border-radius: 8px;
+      font-size: 1.08em;
+      font-weight: 600;
+      box-shadow: 0 2px 12px rgba(39,174,96,0.12);
+      z-index: 2000;
+      opacity: 0.97;
+      transition: opacity 0.3s;
+    }
+    .notification.error { background: #e74c3c; }
+    @media (max-width: 600px) {
+      .product-list-simple {
+        max-width: 100%;
+        padding: 0 2vw;
+      }
+      .product-list-item {
+        padding: 0.6rem 0.5rem;
+        font-size: 0.98em;
+      }
+      .product-list-edit-btn {
+        padding: 0.3rem 0.8rem;
+        font-size: 0.97em;
+      }
+      .modal-content-scrollable {
+        padding: 1rem;
+        max-width: 98vw;
+        max-height: 98vh;
+      }
+    }
+    </style>
+</head>
+<body>
+    <header class="header-bar modern-header">
+        <div class="header-content">
+            <img src="logo.png" alt="Velan Traders Logo" class="logo-header">
+            <h1>Velan Traders <span class="green-title">Product Management</span></h1>
+        </div>
+        <nav class="header-nav">
+            <button class="main-btn" onclick="window.location.href='index.html'">Make an Invoice</button>
+            <button class="main-btn" onclick="window.location.href='invoices.html'">Previous Invoices</button>
+            <button class="main-btn" onclick="window.location.href='product-management.html'">Product Management</button>
+            <button class="main-btn" id="logoutBtn" style="display:none;">Logout</button>
+        </nav>
+    </header>
+    <div class="container" style="max-width:1100px;margin:2rem auto;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem 0;">
+            <h2 style="font-size:2rem;font-weight:700;color:#27ae60;margin:0;">Product Management</h2>
+            <button class="main-btn" style="padding:0.7rem 2rem;font-size:1.1rem;" onclick="window.location.href='add-products.html'">+ Add Product</button>
+        </div>
+        <div id="productsTableContainer" style="margin-top:2rem;background:#fff;border-radius:16px;box-shadow:0 2px 16px rgba(39,174,96,0.08);padding:2rem 1rem;"></div>
+    </div>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="firebaseconfig.js"></script>
+    <script>
+    async function loadProducts() {
+        const container = document.getElementById('productsTableContainer');
+        try {
+            const snapshot = await firebase.firestore().collection('products').orderBy('name').get();
+            if (snapshot.empty) {
+                container.innerHTML = '<span style="color:orange">No products found.</span>';
+                return;
+            }
+            let html = `<div class="product-list-simple">`;
+            snapshot.forEach(doc => {
+                const p = doc.data();
+                // Escape single quotes for JS string
+                const safeName = (p.name || '').replace(/'/g, "&#39;");
+                html += `<div class="product-list-item">
+                    <span><span class="product-list-name">${p.name}</span><span class="product-list-unit">${p.unit || ''}</span></span>
+                    <span>
+                      <button class="product-list-edit-btn" onclick="editProduct('${doc.id}')">Edit</button>
+                      <button class="product-list-edit-btn" style="background:#e74c3c;margin-left:0.5em;" onclick=\"deleteProduct('${doc.id}','${safeName}')\">Delete</button>
+                    </span>
+                </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        } catch (err) {
+            container.innerHTML = '<span style="color:red">Failed to load products.</span>';
+        }
+    }
+
+    function showNotification(msg, isError) {
+      const n = document.createElement('div');
+      n.className = 'notification' + (isError ? ' error' : '');
+      n.textContent = msg;
+      document.body.appendChild(n);
+      setTimeout(() => { n.style.opacity = 0.2; }, 1800);
+      setTimeout(() => { n.remove(); }, 2500);
+    }
+
+    async function deleteProduct(id, name) {
+      if (!confirm('Delete product "' + name + '"?')) return;
+      try {
+        await firebase.firestore().collection('products').doc(id).delete();
+        showNotification('Product deleted!');
+        loadProducts();
+      } catch (err) {
+        showNotification('Error deleting: ' + err.message, true);
+      }
+    }
+
+    async function editProduct(id) {
+        const doc = await firebase.firestore().collection('products').doc(id).get();
+        if (!doc.exists) return alert('Product not found');
+        const p = doc.data();
+        const formHtml = `
+        <div class='modal-overlay' id='editModal'>
+            <div class='modal-content-scrollable'>
+                <h3>Edit Product</h3>
+                <form id='editProductForm'>
+                    <label>Name<input name='name' value='${p.name}' required class='input-pro'></label><br />
+                    <label>Price<input name='price' type='number' min='0' step='0.01' value='${p.price}' required class='input-pro'></label><br />
+                    <label>Quantity<input name='quantity' type='number' min='0' value='${p.quantity}' required class='input-pro'></label><br />
+                    <label>Unit<input name='unit' value='${p.unit || ''}' required class='input-pro'></label><br />
+                    <label>Category<input name='category' value='${p.category}' required class='input-pro'></label><br />
+                    <label>Description<textarea name='description' rows='2' class='textarea-pro'>${p.description || ''}</textarea></label><br />
+                    <button type='submit' class='main-btn'>Save</button>
+                    <button type='button' class='main-btn' onclick='document.getElementById("editModal").remove()' style='background:#ccc;color:#222;'>Cancel</button>
+                </form>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', formHtml);
+        document.getElementById('editProductForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const f = e.target;
+            const data = {
+                name: f.name.value.trim(),
+                price: parseFloat(f.price.value),
+                quantity: parseInt(f.quantity.value),
+                unit: f.unit.value.trim(),
+                category: f.category.value.trim(),
+                description: f.description.value.trim()
+            };
+            try {
+                await firebase.firestore().collection('products').doc(id).update(data);
+                showNotification('Product updated!');
+                document.getElementById('editModal').remove();
+                loadProducts();
+            } catch (err) {
+                showNotification('Error: ' + err.message, true);
+            }
+        };
+    }
+    loadProducts();
+    </script>
+</body>
+</html>

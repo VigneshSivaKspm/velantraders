@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Product - Velan Traders</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="header-bar modern-header">
+        <div class="header-content">
+            <img src="logo.png" alt="Velan Traders Logo" class="logo-header">
+            <h1>Velan Traders <span class="green-title">Product Management</span></h1>
+        </div>
+        <nav class="header-nav">
+            <button class="main-btn" onclick="window.location.href='index.html'">Make an Invoice</button>
+            <button class="main-btn" onclick="window.location.href='invoices.html'">Previous Invoices</button>
+            <button class="main-btn" onclick="window.location.href='product-management.html'">Product Management</button>
+        </nav>
+    </header>
+    <div class="container">
+        <form id="addProductForm">
+            <fieldset>
+                <legend>Add New Product</legend>
+                <div class="form-row">
+                    <div class="form-col">
+                        <label>Product Name</label>
+                        <input name="name" required class="input-pro">
+                    </div>
+                    <div class="form-col">
+                        <label>Price</label>
+                        <input name="price" type="number" min="0" step="0.01" required class="input-pro">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-col">
+                        <label>Quantity</label>
+                        <input name="quantity" type="number" min="0" required class="input-pro">
+                    </div>
+                    <div class="form-col">
+                        <label>Unit <span style="color:#1a6332;font-size:0.95em;">(e.g. 100g, 1L, 1 piece)</span></label>
+                        <input name="unit" required class="input-pro" placeholder="e.g. 100g, 1L, 1 piece">
+                    </div>
+                    <div class="form-col">
+                        <label>Category</label>
+                        <input name="category" required class="input-pro">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-col" style="width:100%">
+                        <label>Description</label>
+                        <textarea name="description" rows="2" class="textarea-pro"></textarea>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <button type="submit" class="main-btn" style="width:100%;margin-top:0.5rem;">Add Product</button>
+                </div>
+            </fieldset>
+        </form>
+        <div id="addProductResult"></div>
+    </div>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="firebaseconfig.js"></script>
+    <script>
+    document.getElementById('addProductForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const data = {
+            name: form.name.value.trim(),
+            price: parseFloat(form.price.value),
+            quantity: parseInt(form.quantity.value),
+            unit: form.unit.value.trim(),
+            category: form.category.value.trim(),
+            description: form.description.value.trim(),
+            createdAt: new Date()
+        };
+        try {
+            await firebase.firestore().collection('products').add(data);
+            document.getElementById('addProductResult').innerHTML = '<span style="color:green">Product added successfully!</span>';
+            form.reset();
+        } catch (err) {
+            document.getElementById('addProductResult').innerHTML = '<span style="color:red">Error: ' + err.message + '</span>';
+        }
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Velan Traders Invoice Generator</title>
+    <script>
+      // Only add cache-busting param if not already present
+      if (!window.location.search.includes('v=')) {
+        window.location.replace(window.location.pathname + '?v=' + Date.now());
+      }
+    </script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+    /* Responsive and compact product selection UI */
+    .selected-products-list {
+      width: 100%;
+      max-width: 500px;
+      margin: 0 auto 1rem auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+    .selected-product-row {
+      background: #f8f8f8;
+      border-radius: 8px;
+      padding: 0.7rem 1rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .prod-main-info {
+      display: flex;
+      gap: 1.2rem;
+      align-items: center;
+      font-size: 1.08em;
+      font-weight: 500;
+      flex-wrap: wrap;
+    }
+    .prod-name { color: #1a6332; font-weight: 600; }
+    .prod-unit { color: #888; font-size: 0.98em; }
+    .prod-price { color: #333; font-weight: 500; }
+    .prod-qty-row {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+    }
+    .prod-qty-row label { font-size: 0.98em; color: #444; }
+    .selected-qty-input {
+      width: 60px;
+      padding: 0.2rem 0.4rem;
+      font-size: 1em;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    .remove-btn {
+      background: #e74c3c;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 0.2rem 0.8rem;
+      font-size: 0.98em;
+      margin-left: 0.5rem;
+      cursor: pointer;
+    }
+    .grand-total-row {
+      text-align: right;
+      font-size: 1.1em;
+      margin-top: 0.5rem;
+      color: #1a6332;
+      font-weight: 600;
+    }
+    @media (max-width: 600px) {
+      .selected-products-list {
+        max-width: 100%;
+        padding: 0 2vw;
+      }
+      .selected-product-row {
+        padding: 0.6rem 0.5rem;
+      }
+      .prod-main-info {
+        gap: 0.6rem;
+        font-size: 1em;
+      }
+      .prod-qty-row {
+        gap: 0.4rem;
+        font-size: 0.98em;
+      }
+      .grand-total-row {
+        font-size: 1em;
+      }
+    }
+    </style>
+</head>
+<body>
+    <header class="header-bar modern-header">
+        <div class="header-content">
+            <img src="logo.png" alt="Velan Traders Logo" class="logo-header" onerror="this.style.display='none'">
+            <h1>Velan Traders <span class="green-title">Invoice Portal</span></h1>
+           </div>
+           <button class="main-btn" id="logoutBtn" style="display:none;">Logout</button>
+        <nav class="header-nav">
+
+            <button class="main-btn" onclick="window.location.href='index.html'">Make an Invoice</button>
+            <button class="main-btn" onclick="window.location.href='invoices.html'">Previous Invoices</button>
+            <button class="main-btn" onclick="window.location.href='product-management.html'">Product Management</button>
+
+        </nav>
+    </header>
+    <div id="auth-section">
+      <!-- Signup form removed, only login form remains -->
+      <form id="loginForm">
+        <fieldset>
+          <legend><span class="green-title">Login</span></legend>
+          <div class="form-row">
+            <div class="form-col">
+              <label>Email</label>
+              <input type="email" name="email" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-col">
+              <label>Password</label>
+              <input type="password" name="password" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <button type="submit" class="main-btn" style="width:100%;margin-top:0.5rem;">Login</button>
+          </div>
+        </fieldset>
+      </form>
+    </div>
+    <div id="main-menu" style="display:none;">
+      <form id="invoiceForm">
+        <fieldset class="form-section">
+          <legend>Customer Details</legend>
+          <div class="form-row">
+            <div class="form-col">
+              <label>Name</label>
+              <input name="customerName" required class="input-pro">
+            </div>
+            <div class="form-col">
+              <label>Phone</label>
+              <input name="customerPhone" required class="input-pro">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-col">
+              <label>Email</label>
+              <input type="email" name="customerEmail" class="input-pro">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-col">
+              <label>Address</label>
+              <input name="customerAddress" class="input-pro">
+            </div>
+            <div class="form-col">
+              <label>City</label>
+              <input name="customerCity" class="input-pro">
+            </div>
+            <div class="form-col">
+              <label>Zip Code</label>
+              <input name="customerZip" class="input-pro">
+            </div>
+          </div>
+        </fieldset>
+        <fieldset class="form-section">
+          <legend>Products</legend>
+          <div style="margin-bottom:1rem;">
+            <input id="productSearchBox" class="input-pro" placeholder="Search or select product by name..." autocomplete="off" style="width:100%;max-width:400px;">
+            <div id="productDropdown" class="dropdown-list" style="position:relative;z-index:10;"></div>
+          </div>
+          <div id="selectedProductsTableContainer"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Payment Details</legend>
+          <div class="form-row">
+            <div class="form-col">
+              <label>Payment Method</label>
+              <div class="radio-group">
+                <label><input type="radio" name="paymentMethod" value="Cash" required id="payCash"> Cash</label>
+                <label><input type="radio" name="paymentMethod" value="Upid/Gpay" id="payUpi"> Upid/Gpay</label>
+              </div>
+            </div>
+            <div class="form-col">
+              <label>Total Amount</label>
+              <input type="number" name="totalAmount" id="totalAmount" required readonly>
+            </div>
+            <div class="form-col">
+              <label>Paid Amount</label>
+              <input type="number" name="paidAmount" id="paidAmount">
+            </div>
+          </div>
+          <div class="form-row" id="upiFields" style="display:none;">
+            <div class="form-col">
+              <label>Upid Number</label>
+              <input name="upidNumber">
+            </div>
+            <div class="form-col">
+              <label>Payment Date</label>
+              <input type="date" name="upidDate">
+            </div>
+            <div class="form-col">
+              <label>Recipient</label>
+              <input name="upidRecipient">
+            </div>
+          </div>
+        </fieldset>
+        <div class="form-row">
+          <button type="submit" class="main-btn" style="width:100%;margin-top:0.5rem;">Generate Invoice</button>
+        </div>
+      </form>
+      <div id="result"></div>
+    </div>
+    <script>
+    // Product search, selection, and invoice logic
+    document.addEventListener('DOMContentLoaded', async function() {
+      // Payment method show/hide UPI fields
+      const payCash = document.getElementById('payCash');
+      const payUpi = document.getElementById('payUpi');
+      const upiFields = document.getElementById('upiFields');
+      function updatePaymentFields() {
+        if (payUpi && payUpi.checked) {
+          upiFields.style.display = '';
+        } else {
+          upiFields.style.display = 'none';
+        }
+      }
+      if (payCash && payUpi && upiFields) {
+        payCash.addEventListener('change', updatePaymentFields);
+        payUpi.addEventListener('change', updatePaymentFields);
+        updatePaymentFields();
+      }
+
+      // Product search and selection
+      const productSearchBox = document.getElementById('productSearchBox');
+      const productDropdown = document.getElementById('productDropdown');
+      const selectedProductsTableContainer = document.getElementById('selectedProductsTableContainer');
+      let products = [];
+      let selectedProducts = [];
+      // Load products from Firebase
+      try {
+        const snapshot = await firebase.firestore().collection('products').get();
+        products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (err) {
+        productDropdown.innerHTML = '<span style="color:red">Failed to load products</span>';
+        return;
+      }
+      if (products.length === 0) {
+        productDropdown.innerHTML = '<span style="color:orange">No products found. Please add products first.</span>';
+        return;
+      }
+
+      function renderDropdown(filtered) {
+        if (!filtered.length) {
+          productDropdown.innerHTML = '<div style="padding:0.5rem;color:#888;">No products found</div>';
+          return;
+        }
+        productDropdown.innerHTML = filtered.map((p, idx) =>
+          `<div class="dropdown-item" style="padding:0.5rem;cursor:pointer;" data-idx="${p.idx}">
+            <b>${p.name}</b> <span style="color:#888;font-size:0.9em;">(${p.category}, ${p.unit || ''})</span>
+          </div>`
+        ).join('');
+      }
+
+      productSearchBox.addEventListener('input', function() {
+        const val = this.value.trim().toLowerCase();
+        if (!val) {
+          productDropdown.innerHTML = '';
+          return;
+        }
+        const filtered = products
+          .map((p, idx) => ({...p, idx}))
+          .filter(p => p.name.toLowerCase().includes(val) || (p.category && p.category.toLowerCase().includes(val)));
+        renderDropdown(filtered);
+      });
+
+      productDropdown.addEventListener('click', function(e) {
+        const item = e.target.closest('.dropdown-item');
+        if (!item) return;
+        const idx = parseInt(item.getAttribute('data-idx'));
+        if (selectedProducts.find(sp => sp.idx === idx)) return;
+        selectedProducts.push({ idx, quantity: 1 });
+        productSearchBox.value = '';
+        productDropdown.innerHTML = '';
+        renderSelectedProductsTable();
+        updateTotal();
+      });
+
+      function renderSelectedProductsTable() {
+        if (selectedProducts.length === 0) {
+          selectedProductsTableContainer.innerHTML = '';
+          return;
+        }
+        let html = '<div class="selected-products-list">';
+        selectedProducts.forEach((sp, i) => {
+          const p = products[sp.idx];
+          html += `<div class="selected-product-row">
+            <div class="prod-main-info">
+              <span class="prod-name">${p.name}</span>
+              <span class="prod-unit">${p.unit || ''}</span>
+              <span class="prod-price">₹${p.price}</span>
+            </div>
+            <div class="prod-qty-row">
+              <label>Qty:</label>
+              <input type="number" min="1" max="${p.quantity}" value="${sp.quantity}" data-i="${i}" class="selected-qty-input">
+              <button type="button" class="main-btn remove-btn" data-remove="${i}">Remove</button>
+            </div>
+          </div>`;
+        });
+        html += '</div>';
+        // Grand total
+        let total = 0;
+        selectedProducts.forEach(sp => {
+          const p = products[sp.idx];
+          total += p.price * sp.quantity;
+        });
+        html += `<div class="grand-total-row"><b>Grand Total: ₹${total.toFixed(2)}</b></div>`;
+        selectedProductsTableContainer.innerHTML = html;
+        // Quantity change
+        document.querySelectorAll('.selected-qty-input').forEach(input => {
+          input.addEventListener('input', function() {
+            const i = parseInt(this.getAttribute('data-i'));
+            let val = parseInt(this.value);
+            if (isNaN(val) || val < 1) val = 1;
+            if (val > products[selectedProducts[i].idx].quantity) val = products[selectedProducts[i].idx].quantity;
+            selectedProducts[i].quantity = val;
+            renderSelectedProductsTable();
+            updateTotal();
+          });
+        });
+        // Remove product
+        document.querySelectorAll('button[data-remove]').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const i = parseInt(this.getAttribute('data-remove'));
+            selectedProducts.splice(i, 1);
+            renderSelectedProductsTable();
+            updateTotal();
+          });
+        });
+      }
+      function updateTotal() {
+        let total = 0;
+        selectedProducts.forEach(sp => {
+          const p = products[sp.idx];
+          total += p.price * sp.quantity;
+        });
+        document.getElementById('totalAmount').value = total.toFixed(2);
+        // Also update grand total row if present
+        const grandTotalRow = document.querySelector('.grand-total-row');
+        if (grandTotalRow) grandTotalRow.innerHTML = `<b>Grand Total: ₹${total.toFixed(2)}</b>`;
+      }
+      // Invoice form submit
+      document.getElementById('invoiceForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        if (selectedProducts.length === 0) {
+          document.getElementById('result').innerHTML = '<span style="color:red">Please select at least one product.</span>';
+          return;
+        }
+        const form = e.target;
+        // Prepare data for app.js handler
+        const paidAmount = form.paidAmount && form.paidAmount.value ? parseFloat(form.paidAmount.value) : 0;
+        const totalAmount = parseFloat(form.totalAmount.value);
+        const invoiceData = {
+          customer: {
+            name: form.customerName.value.trim(),
+            phone: form.customerPhone.value.trim(),
+            email: form.customerEmail.value.trim(),
+            address: form.customerAddress.value.trim(),
+            city: form.customerCity.value.trim(),
+            zip: form.customerZip.value.trim()
+          },
+          products: selectedProducts.map(sp => ({
+            id: products[sp.idx].id,
+            name: products[sp.idx].name,
+            price: products[sp.idx].price,
+            category: products[sp.idx].category,
+            unit: products[sp.idx].unit,
+            quantity: sp.quantity,
+            subtotal: (products[sp.idx].price * sp.quantity)
+          })),
+          totalAmount,
+          paidAmount,
+          paymentMethod: form.paymentMethod.value,
+          upidNumber: form.upidNumber ? form.upidNumber.value : '',
+          upidDate: form.upidDate ? form.upidDate.value : '',
+          upidRecipient: form.upidRecipient ? form.upidRecipient.value : '',
+          createdAt: new Date()
+        };
+        // Call the app.js handler (which will store, generate, and show the invoice)
+        if (window.handleBookingSubmit) {
+          const submitBtn = form.querySelector('button[type="submit"]');
+          await window.handleBookingSubmit(invoiceData, submitBtn);
+        }
+        form.reset();
+        selectedProducts = [];
+        renderSelectedProductsTable();
+        updateTotal();
+      });
+      // PDF generation (modern look) - REMOVED, now handled by app.js
+    });
+    </script>
+    <!-- Load Firebase scripts in correct order -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="firebaseconfig.js"></script>
+    <!-- Load jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Load your scripts after Firebase -->
+    <script src="auth.js"></script>
+    <script src="app.js"></script>
+    <script>
+    // Payment method show/hide UPI fields
+    document.addEventListener('DOMContentLoaded', function() {
+        const payCash = document.getElementById('payCash');
+        const payUpi = document.getElementById('payUpi');
+        const upiFields = document.getElementById('upiFields');
+        function updatePaymentFields() {
+            if (payUpi.checked) {
+                upiFields.style.display = '';
+            } else {
+                upiFields.style.display = 'none';
+            }
+        }
+        if (payCash && payUpi && upiFields) {
+            payCash.addEventListener('change', updatePaymentFields);
+            payUpi.addEventListener('change', updatePaymentFields);
+            updatePaymentFields();
+        }
+    });
+    </script>
+</body>
+</html>
