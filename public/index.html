@@ -324,12 +324,29 @@
         document.querySelectorAll('.selected-qty-input').forEach(input => {
           input.addEventListener('input', function() {
             const i = parseInt(this.getAttribute('data-i'));
+            // Allow blank while editing
+            if (this.value === '') {
+              selectedProducts[i].quantity = '';
+              updateTotal();
+              return;
+            }
             let val = parseInt(this.value);
             if (isNaN(val) || val < 1) val = 1;
             if (val > products[selectedProducts[i].idx].quantity) val = products[selectedProducts[i].idx].quantity;
             selectedProducts[i].quantity = val;
             renderSelectedProductsTable();
             updateTotal();
+          });
+          // On blur, set to 1 if blank or invalid
+          input.addEventListener('blur', function() {
+            const i = parseInt(this.getAttribute('data-i'));
+            let val = parseInt(this.value);
+            if (isNaN(val) || val < 1) {
+              this.value = 1;
+              selectedProducts[i].quantity = 1;
+              renderSelectedProductsTable();
+              updateTotal();
+            }
           });
         });
         // Remove product
@@ -411,7 +428,7 @@
     <script src="firebaseconfig.js"></script>
     <!-- Load jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- Load your scripts after Firebase -->
+    <!-- Load your scripts after Firebase and jsPDF -->
     <script src="auth.js"></script>
     <script src="app.js"></script>
     <script>

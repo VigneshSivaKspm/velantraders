@@ -102,11 +102,11 @@ async function generatePremiumPDF(data) {
       return null;
     }
   }
-  const [logo, instaQR, gpayQR, sign] = await Promise.all([
+  // Ensure correct filenames and order
+  const [logo, sign, qr] = await Promise.all([
     safeToDataUrl('logo.png'),
-    safeToDataUrl('instagram.jpg'),
-    safeToDataUrl('GooglePay_QR.png'),
-    safeToDataUrl('sign.png')
+    safeToDataUrl('sign.png'),
+    safeToDataUrl('qr.jpg')
   ]);
 
   // Premium color palette
@@ -314,6 +314,21 @@ async function generatePremiumPDF(data) {
   doc.text('Balance Due', margin + 12, payY);
   doc.text(`: ${formatCurrency(balance)}`, margin + 100, payY);
   payY += 16;
+  // Show cleared details if present
+  if (data.clearedAmount && data.clearedDate) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(colors.gold);
+    doc.text('Cleared Amount', margin + 12, payY);
+    doc.text(`: ${formatCurrency(data.clearedAmount)}`, margin + 100, payY);
+    payY += 13;
+    doc.text('Cleared Date', margin + 12, payY);
+    doc.text(`: ${formatDate(data.clearedDate)}`, margin + 100, payY);
+    payY += 16;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(colors.textDark);
+  }
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(colors.textDark);
@@ -365,16 +380,15 @@ function formatDateTime(dtStr) {
   yPos = yPos + 70; // Add space after customer signature section
 
   // ==================== FOOTER SIGNATURE (Managing Director) ====================
-  // Move signature a bit higher and more to the right for better alignment
-  const directorSignY = pageHeight - margin - 130; // move up by 30px
-  const directorSignX = pageWidth - margin - 100; // move right by 40px
+  // Place sign above the 'Managing Director' label in the footer
+  const directorLabelX = pageWidth - margin - 60; // center label under signature image
+  const directorFooterGap = 40; // increase gap between footer and director content
+  const directorLabelY = pageHeight - margin - 60 - directorFooterGap;
   if (sign) {
     try {
-      doc.addImage(sign, 'JPEG', directorSignX, directorSignY, 80, 40);
+      doc.addImage(sign, 'PNG', directorLabelX - 40, directorLabelY - 50, 80, 40);
     } catch (e) {}
   }
-  const directorLabelX = directorSignX + 40; // center label under signature image
-  const directorLabelY = directorSignY + 40 + 10;
   doc.setFontSize(10);
   doc.setTextColor(colors.textDark);
   doc.text('Managing Director', directorLabelX, directorLabelY, { align: 'center' });
@@ -408,28 +422,20 @@ function formatDateTime(dtStr) {
   xFooter += doc.getTextWidth(emailLabel);
   doc.textWithLink(footerEmail, xFooter, yFooter, { url: `mailto:${footerEmail}` });
 
-  // QR codes with extra right margin
-  const qrSize = 30;
-  const qrGap = 10;
-  const extraRightMargin = 20;
-  if (instaQR) {
+  // Place qr.png inside the footer bar, bottom right
+  if (qr) {
     try {
-      doc.addImage(instaQR, 'JPEG', pageWidth - margin - qrSize * 2 - qrGap - extraRightMargin, yPos + 5, qrSize, qrSize);
-    } catch (e) {}
-  }
-  if (gpayQR) {
-    try {
-      doc.addImage(gpayQR, 'PNG', pageWidth - margin - qrSize - extraRightMargin, yPos + 5, qrSize, qrSize);
-    } catch (e) {}
+      const qrFooterSize = 36;
+      const qrFooterY = yPos + 2;
+      const qrFooterX = pageWidth - margin - qrFooterSize - 8; // 8px padding from right
+      doc.addImage(qr, 'PNG', qrFooterX, qrFooterY, qrFooterSize, qrFooterSize);
+    } catch (e) {
+      console.error('Error drawing qr.png in footer:', e);
+    }
+  } else {
+    console.warn('qr.png not loaded or not found.');
   }
 
-  // --- Make customer phone/email clickable in client details section ---
-  // Find the y positions used for phone/email in client details
-  // These are calculated as:
-  // let clientY = yPos + 90 + 15; // Name
-  // clientY += 13; // Phone
-  // clientY += 13; // Email
-  // So:
   let baseY = margin + 90 + 15; // Name
   let phoneY = baseY + 13; // Phone
   let emailY = phoneY + 13; // Email

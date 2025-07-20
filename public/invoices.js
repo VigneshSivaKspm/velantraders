@@ -110,6 +110,9 @@ class InvoiceManager {
     }
   
     renderInvoiceCard(invoice, idx) {
+      const grandTotal = Number(invoice.totalAmount) || 0;
+      const paid = Number(invoice.paidAmount) || 0;
+      const balance = grandTotal - paid;
       return `
         <div class="invoice-card" data-id="${invoice.id}">
           <div class="invoice-info">
@@ -126,6 +129,10 @@ class InvoiceManager {
             <button class="action-btn download-btn" data-idx="${idx}">
               <i class="icon">📥</i> PDF
             </button>
+            <button class="action-btn edit-btn" data-idx="${idx}">
+              <i class="icon">✏️</i> Edit
+            </button>
+            ${balance > 0 ? `<button class="action-btn clear-balance-btn" data-idx="${idx}"><i class="icon">✔️</i> Clear Balance</button>` : ''}
           </div>
         </div>
       `;
@@ -156,11 +163,67 @@ class InvoiceManager {
         });
       });
 
+      document.querySelectorAll('.clear-balance-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = btn.dataset.idx;
+          this.showClearBalanceModal(invoices[idx]);
+        });
+      });
+
       document.querySelectorAll('.invoice-card').forEach(card => {
         card.addEventListener('click', () => {
           const idx = card.querySelector('.view-btn').dataset.idx;
           this.showInvoiceModal(invoices[idx]);
         });
+      });
+    }
+
+    showClearBalanceModal(invoice) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <button class="modal-close" aria-label="Close">&times;</button>
+          <header class="modal-header">
+            <h2>Clear Balance for Invoice #${invoice.invoiceNumber || invoice.id || 'N/A'}</h2>
+          </header>
+          <form class="clear-balance-form modal-body">
+            <div class="detail-row">
+              <label>Paid Amount:</label>
+              <input type="number" name="paidAmount" min="0" step="0.01" value="${invoice.totalAmount}" required style="width:100%;padding:0.7rem 1rem;border:2px solid #e0e0e0;border-radius:12px;font-size:1.05rem;margin-top:0.35rem;margin-bottom:0.7rem;background:#f6fbf8;">
+            </div>
+            <div class="detail-row">
+              <label>Due Cleared Date:</label>
+              <input type="date" name="dueClearedDate" value="${new Date().toISOString().slice(0,10)}" required style="width:100%;padding:0.7rem 1rem;border:2px solid #e0e0e0;border-radius:12px;font-size:1.05rem;margin-top:0.35rem;margin-bottom:0.7rem;background:#f6fbf8;">
+            </div>
+            <footer class="modal-footer">
+              <button class="btn save-btn" type="submit"><i class="icon">✔️</i> Mark as Cleared</button>
+            </footer>
+          </form>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
+      modal.addEventListener('click', (e) => e.target === modal && modal.remove());
+      const form = modal.querySelector('.clear-balance-form');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const paidAmount = parseFloat(form.paidAmount.value);
+        const clearedAmount = paidAmount;
+        const clearedDate = form.dueClearedDate.value;
+        try {
+          await db.collection('invoices').doc(invoice.id).update({
+            paidAmount,
+            clearedAmount,
+            clearedDate
+          });
+          alert('Balance marked as cleared!');
+          modal.remove();
+          this.renderInvoices();
+        } catch (err) {
+          alert('Failed to update invoice.');
+        }
       });
     }
     showEditModal(invoice) {
@@ -179,17 +242,30 @@ class InvoiceManager {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const formData = new FormData(form);
-        const updated = {};
-        for (const [key, value] of formData.entries()) {
-          updated[key] = value;
-        }
+        // Build updated invoice object
+        const updated = {
+          customer: {
+            name: formData.get('customerName'),
+            phone: formData.get('customerPhone'),
+            email: formData.get('customerEmail'),
+            address: formData.get('customerAddress'),
+            city: formData.get('customerCity'),
+            zip: formData.get('customerZip')
+          },
+          totalAmount: parseFloat(formData.get('totalAmount')),
+          paidAmount: parseFloat(formData.get('paidAmount')),
+          paymentMethod: formData.get('paymentMethod'),
+          upidNumber: formData.get('upidNumber'),
+          upidDate: formData.get('upidDate'),
+          upidRecipient: formData.get('upidRecipient')
+        };
         try {
-          await db.collection('bookings').doc(invoice.id).update(updated);
-          alert('Booking updated successfully!');
+          await db.collection('invoices').doc(invoice.id).update(updated);
+          alert('Invoice updated successfully!');
           modal.remove();
           this.renderInvoices();
         } catch (err) {
-          alert('Failed to update booking.');
+          alert('Failed to update invoice.');
         }
       });
     }
@@ -226,61 +302,34 @@ class InvoiceManager {
     getEditModalHTML(invoice) {
       const inputStyle = `width:100%;padding:0.7rem 1rem;border:2px solid #e0e0e0;border-radius:12px;font-size:1.05rem;margin-top:0.35rem;margin-bottom:0.7rem;background:#f6fbf8;transition:border-color 0.2s,box-shadow 0.2s,background 0.2s;box-shadow:0 2px 8px rgba(39,174,96,0.06);color:#212529;`;
       const inputFocus = `onfocus="this.style.outline='none';this.style.borderColor='#27ae60';this.style.background='#fff';this.style.boxShadow='0 0 0 2px rgba(39,174,96,0.12)';" onblur="this.style.borderColor='#e0e0e0';this.style.background='#f6fbf8';this.style.boxShadow='0 2px 8px rgba(39,174,96,0.06)';"`;
+      const c = invoice.customer || {};
       return `
         <div class="modal-content">
           <button class="modal-close" aria-label="Close">&times;</button>
           <header class="modal-header">
-            <h2>Edit Booking #${invoice.bookingNumber || 'N/A'}</h2>
+            <h2>Edit Invoice #${invoice.invoiceNumber || invoice.id || 'N/A'}</h2>
           </header>
           <form class="edit-invoice-form modal-body">
             <section class="modal-section">
               <h3 class="section-title">Customer Details</h3>
               <div class="section-content">
-                <div class="detail-row"><label>Name: <input name="contactName" value="${invoice.contactName || ''}" required style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Contact: <input name="phone" value="${invoice.phone || ''}" required style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Email: <input name="email" value="${invoice.email || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Address: <input name="address" value="${invoice.address || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>City: <input name="city" value="${invoice.city || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Zip: <input name="zip" value="${invoice.zip || ''}" style="${inputStyle}" ${inputFocus}></label></div>
+                <div class="detail-row"><label>Name: <input name="customerName" value="${c.name || ''}" required style="${inputStyle}" ${inputFocus}></label></div>
+                <div class="detail-row"><label>Phone: <input name="customerPhone" value="${c.phone || ''}" required style="${inputStyle}" ${inputFocus}></label></div>
+                <div class="detail-row"><label>Email: <input name="customerEmail" value="${c.email || ''}" style="${inputStyle}" ${inputFocus}></label></div>
+                <div class="detail-row"><label>Address: <input name="customerAddress" value="${c.address || ''}" style="${inputStyle}" ${inputFocus}></label></div>
+                <div class="detail-row"><label>City: <input name="customerCity" value="${c.city || ''}" style="${inputStyle}" ${inputFocus}></label></div>
+                <div class="detail-row"><label>Zip: <input name="customerZip" value="${c.zip || ''}" style="${inputStyle}" ${inputFocus}></label></div>
               </div>
             </section>
             <section class="modal-section">
-              <h3 class="section-title">Event Details</h3>
+              <h3 class="section-title">Payment Details</h3>
               <div class="section-content">
-                <div class="detail-row"><label>Event Type: <input name="eventType" value="${invoice.eventType || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Event For: <input name="eventFor" value="${invoice.eventFor || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Event Date: <input name="eventDate" type="date" value="${invoice.eventDate ? new Date(invoice.eventDate).toISOString().slice(0,10) : ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Start Time: <input name="startTime" value="${invoice.startTime || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Finish Time: <input name="finishTime" value="${invoice.finishTime || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Venue: <input name="functionRoom" value="${invoice.functionRoom || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Organization: <input name="organization" value="${invoice.organization || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Company Name: <input name="companyName" value="${invoice.companyName || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>System Name: <input name="systemName" value="${invoice.systemName || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-              </div>
-            </section>
-            <section class="modal-section">
-              <h3 class="section-title">Equipment</h3>
-              <div class="section-content">
-                <div class="detail-row"><label>Other Systems: <input name="otherSystems" value="${(invoice.otherSystems || []).join(', ')}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Details: <input name="details" value="${invoice.details || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-              </div>
-            </section>
-            <section class="modal-section">
-              <h3 class="section-title">Payment</h3>
-              <div class="section-content">
-                <div class="detail-row"><label>Advance Paid: <input name="advanceAmount" value="${invoice.advanceAmount || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Total Amount: <input name="totalAmount" value="${invoice.totalAmount || ''}" style="${inputStyle}" ${inputFocus}></label></div>
+                <div class="detail-row"><label>Total Amount: <input name="totalAmount" type="number" value="${invoice.totalAmount || ''}" style="${inputStyle}" ${inputFocus}></label></div>
+                <div class="detail-row"><label>Paid Amount: <input name="paidAmount" type="number" value="${invoice.paidAmount || ''}" style="${inputStyle}" ${inputFocus}></label></div>
                 <div class="detail-row"><label>Payment Method: <input name="paymentMethod" value="${invoice.paymentMethod || ''}" style="${inputStyle}" ${inputFocus}></label></div>
                 <div class="detail-row"><label>UPI Number: <input name="upidNumber" value="${invoice.upidNumber || ''}" style="${inputStyle}" ${inputFocus}></label></div>
                 <div class="detail-row"><label>UPI Date: <input name="upidDate" type="date" value="${invoice.upidDate ? new Date(invoice.upidDate).toISOString().slice(0,10) : ''}" style="${inputStyle}" ${inputFocus}></label></div>
                 <div class="detail-row"><label>UPI Recipient: <input name="upidRecipient" value="${invoice.upidRecipient || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-              </div>
-            </section>
-            <section class="modal-section">
-              <h3 class="section-title">Other Information</h3>
-              <div class="section-content">
-                <div class="detail-row"><label>Referral Name: <input name="referralName" value="${invoice.referralName || ''}" style="${inputStyle}" ${inputFocus}></label></div>
-                <div class="detail-row"><label>Reference: <input name="reference" value="${invoice.reference || ''}" style="${inputStyle}" ${inputFocus}></label></div>
               </div>
             </section>
             <footer class="modal-footer">
@@ -311,7 +360,6 @@ class InvoiceManager {
       return `
         <div class="modal-content">
           <button class="modal-close" aria-label="Close">&times;</button>
-          
           <header class="modal-header">
             <h2>Invoice #${invoice.invoiceNumber || invoice.id || 'N/A'}</h2>
             <div class="invoice-status">
@@ -319,15 +367,11 @@ class InvoiceManager {
               <span class="amount">${this.formatCurrency(invoice.totalAmount)}</span>
             </div>
           </header>
-          
           <div class="modal-body">
             ${this.renderModalSection('Customer Details', this.getCustomerDetailsHTML(invoice))}
-            ${this.renderModalSection('Event Details', this.getEventDetailsHTML(invoice))}
-            ${this.renderModalSection('Equipment', this.getEquipmentHTML(invoice))}
-            ${this.renderModalSection('Payment', this.getPaymentHTML(invoice))}
-            ${this.renderModalSection('Other Information', this.getOtherInfoHTML(invoice))}
+            ${this.renderModalSection('Products', this.getProductsTableHTML(invoice))}
+            ${this.renderModalSection('Totals & Payment', this.getTotalsAndPaymentHTML(invoice))}
           </div>
-          
           <footer class="modal-footer">
             <button class="btn download-pdf-btn">
               <i class="icon">📥</i> Download PDF
@@ -371,14 +415,58 @@ class InvoiceManager {
     }
   
 
-    getEventDetailsHTML(invoice) {
-      if (!invoice.products) return '<div>No product details</div>';
-      let html = '<table style="width:100%"><thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Qty</th><th>Subtotal</th></tr></thead><tbody>';
-      invoice.products.forEach(p => {
-        html += `<tr><td>${p.name}</td><td>${p.category}</td><td>${p.price}</td><td>${p.quantity}</td><td>${p.subtotal.toFixed(2)}</td></tr>`;
+    // Modern product table for modal
+    getProductsTableHTML(invoice) {
+      if (!Array.isArray(invoice.products) || invoice.products.length === 0) {
+        return '<div>No products in this invoice.</div>';
+      }
+      let html = `<div class="responsive-table-wrapper"><table class="product-table-modal"><thead><tr>
+        <th>S.No</th><th>Name</th><th>Unit</th><th>Price</th><th>Qty</th><th>Subtotal</th>
+      </tr></thead><tbody>`;
+      invoice.products.forEach((p, idx) => {
+        html += `<tr>
+          <td>${idx + 1}</td>
+          <td>${p.name || ''}</td>
+          <td>${p.unit || ''}</td>
+          <td>${this.formatCurrency(p.price)}</td>
+          <td>${p.quantity || ''}</td>
+          <td>${this.formatCurrency(p.subtotal)}</td>
+        </tr>`;
       });
-      html += '</tbody></table>';
+      html += '</tbody></table></div>';
       return html;
+    }
+
+    // Modern totals and payment section for modal
+    getTotalsAndPaymentHTML(invoice) {
+      // Calculate totals
+      let totalProducts = 0, subtotal = 0;
+      if (Array.isArray(invoice.products)) {
+        invoice.products.forEach(p => {
+          totalProducts += Number(p.quantity) || 0;
+          subtotal += Number(p.subtotal) || 0;
+        });
+      }
+      const grandTotal = Number(invoice.totalAmount) || subtotal;
+      const paid = Number(invoice.paidAmount) || 0;
+      const balance = grandTotal - paid;
+      return `
+        <div class="totals-list">
+          <div class="detail-row"><span class="detail-label">Total Products:</span><span class="detail-value">${totalProducts}</span></div>
+          <div class="detail-row"><span class="detail-label">Subtotal:</span><span class="detail-value">${this.formatCurrency(subtotal)}</span></div>
+          <div class="detail-row"><span class="detail-label">Grand Total:</span><span class="detail-value">${this.formatCurrency(grandTotal)}</span></div>
+          <div class="detail-row"><span class="detail-label">Paid Amount:</span><span class="detail-value">${this.formatCurrency(paid)}</span></div>
+          <div class="detail-row"><span class="detail-label">Balance Due:</span><span class="detail-value">${this.formatCurrency(balance)}</span></div>
+        </div>
+        <div class="payment-details-list">
+          <div class="detail-row"><span class="detail-label">Payment Method:</span><span class="detail-value">${invoice.paymentMethod || 'N/A'}</span></div>
+          ${invoice.paymentMethod && invoice.paymentMethod.toLowerCase().includes('upi') ? `
+            <div class="detail-row"><span class="detail-label">UPI Number:</span><span class="detail-value">${invoice.upidNumber || 'N/A'}</span></div>
+            <div class="detail-row"><span class="detail-label">UPI Date:</span><span class="detail-value">${this.formatDate(invoice.upidDate)}</span></div>
+            <div class="detail-row"><span class="detail-label">UPI Recipient:</span><span class="detail-value">${invoice.upidRecipient || 'N/A'}</span></div>
+          ` : ''}
+        </div>
+      `;
     }
 
     getEquipmentHTML(invoice) {
